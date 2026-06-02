@@ -42,7 +42,7 @@ $password = [
                         <div class="col-12 alert alert-danger" role="alert">
                             <hr>
                             <p class="mb-0">
-                                <?= session()->getFlashData('failed') ?>
+                                <?= (string) session()->getFlashData('failed') ?>
                             </p>
                         </div>
                     <?php
