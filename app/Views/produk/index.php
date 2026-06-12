@@ -25,6 +25,10 @@ if (session()->getFlashData('failed')) {
     Tambah Data
 </button>
 
+<a class="btn btn-success" target="_blank" href="<?= base_url()?>produk/download">
+    Download Data
+</a>
+
 <table class="table datatable">
     <thead>
         <tr>

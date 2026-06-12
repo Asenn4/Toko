@@ -36,6 +36,9 @@ class ProdukController extends BaseController
             $fileName = $dataFoto->getRandomName(); 
             $dataFoto->move('img/', $fileName);
             
+            // Compress image untuk menghemat memory
+            $this->compressImage('img/' . $fileName);
+            
             $dataForm['foto'] = $fileName;
         }
 
@@ -64,6 +67,9 @@ class ProdukController extends BaseController
                 $fileName = $dataFoto->getRandomName();
                 $dataFoto->move('img/', $fileName);
                 
+                // Compress image untuk menghemat memory
+                $this->compressImage('img/' . $fileName);
+                
                 $dataForm['foto'] = $fileName;
             }
         }
@@ -81,32 +87,111 @@ class ProdukController extends BaseController
     }
     
     public function download() {
-        // Ambil data produk dari database
-        $products = $this->productModel->findAll();
+        // Boost memory limit untuk proses PDF
+        $oldMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '1024M');
+        
+        try {
+            // Ambil data produk dari database
+            $products = $this->productModel->findAll();
 
-        // Render view menjadi HTML
-        $html = view('produk/download_pdf', [
-            'products' => $products
-        ]);
+            // Render view menjadi HTML
+            $html = view('produk/download_pdf', [
+                'products' => $products
+            ]);
 
-        // Nama file PDF
-        $filename = date('Y-m-d-H-i-s') . '-produk.pdf';
+            // Nama file PDF
+            $filename = date('Y-m-d-H-i-s') . '-produk.pdf';
 
-        // Inisialisasi Dompdf
-        $dompdf = new Dompdf();
+            // Inisialisasi Dompdf dengan opsi memory yang lebih efisien
+            $options = new \Dompdf\Options();
+            $options->set('isRemoteEnabled', false);
+            $options->set('tempDir', WRITEPATH . 'uploads');
+            $dompdf = new Dompdf($options);
 
-        // Load HTML ke Dompdf
-        $dompdf->loadHtml($html);
+            // Load HTML ke Dompdf
+            $dompdf->loadHtml($html);
 
-        // Setting ukuran kertas dan orientasi
-        $dompdf->setPaper('A4', 'portrait');
+            // Setting ukuran kertas dan orientasi
+            $dompdf->setPaper('A4', 'portrait');
 
-        // Generate PDF
-        $dompdf->render();
+            // Generate PDF
+            $dompdf->render();
 
-        // Download / tampilkan PDF
-        $dompdf->stream($filename, [
-            'Attachment' => true
-        ]);
+            // Download / tampilkan PDF
+            $dompdf->stream($filename, [
+                'Attachment' => true
+            ]);
+        } finally {
+            // Restore memory limit
+            ini_set('memory_limit', $oldMemoryLimit);
+        }
+    }
+
+    /**
+     * Compress & Resize image untuk menghemat memory
+     * 
+     * @param string $imagePath Path ke file gambar
+     * @param int $maxWidth Max width untuk resize (pixel)
+     * @param int $quality Quality kompresi (1-100)
+     */
+    private function compressImage($imagePath, $maxWidth = 500, $quality = 50) {
+        if (!file_exists($imagePath)) {
+            return;
+        }
+
+        $imageInfo = @getimagesize($imagePath);
+        if ($imageInfo === false) {
+            return;
+        }
+
+        $originalWidth = $imageInfo[0];
+        $originalHeight = $imageInfo[1];
+        $mime = $imageInfo['mime'];
+        
+        // Hitung dimensi baru jika perlu di-resize
+        $newWidth = $originalWidth;
+        $newHeight = $originalHeight;
+        
+        if ($originalWidth > $maxWidth) {
+            $newWidth = $maxWidth;
+            $newHeight = intval(($originalHeight / $originalWidth) * $maxWidth);
+        }
+
+        // Load image
+        switch ($mime) {
+            case 'image/jpeg':
+                $image = imagecreatefromjpeg($imagePath);
+                break;
+            case 'image/png':
+                $image = imagecreatefrompng($imagePath);
+                break;
+            case 'image/gif':
+                $image = imagecreatefromgif($imagePath);
+                break;
+            default:
+                return;
+        }
+
+        // Create resized image
+        $resized = imagecreatetruecolor($newWidth, $newHeight);
+        imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $originalWidth, $originalHeight);
+
+        // Save dengan kompresi
+        switch ($mime) {
+            case 'image/jpeg':
+                imagejpeg($resized, $imagePath, $quality);
+                break;
+            case 'image/png':
+                imagepng($resized, $imagePath, 8);
+                break;
+            case 'image/gif':
+                imagegif($resized, $imagePath);
+                break;
+        }
+
+        // Cleanup
+        imagedestroy($image);
+        imagedestroy($resized);
     }
 }
