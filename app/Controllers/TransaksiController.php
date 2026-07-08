@@ -174,8 +174,13 @@ public function buy()
     $db->transStart(); 
 
     $subtotal = 0;
+    $active_discount = get_active_discount();
+    
     foreach ($cartItems as $item) {
-        $subtotal += $item['qty'] * $item['price'];
+        $harga_diskon = $item['price'] - $active_discount;
+        if ($harga_diskon < 0) $harga_diskon = 0;
+        
+        $subtotal += $item['qty'] * $harga_diskon;
     }
 
     $ongkir = (int) $this->request->getPost('ongkir');
@@ -198,12 +203,15 @@ public function buy()
 
     // insert transaction detail
     foreach ($cartItems as $item) {
+        $harga_diskon = $item['price'] - $active_discount;
+        if ($harga_diskon < 0) $harga_diskon = 0;
+        
         $this->transactionDetailModel->insert([
             'transaction_id' => $transactionId,
             'product_id'     => $item['id'],
             'jumlah'         => $item['qty'],
-            'diskon'         => 0,
-            'subtotal_harga' => $item['qty'] * $item['price'] 
+            'diskon'         => $active_discount,
+            'subtotal_harga' => $item['qty'] * $harga_diskon 
         ]);
     }
 

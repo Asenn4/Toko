@@ -16,6 +16,16 @@
       </form>
     </div><!-- End Search Bar -->
 
+    <?php $active_discount = get_active_discount(); ?>
+    <?php if ($active_discount > 0): ?>
+      <div class="ms-3">
+        <span class="badge bg-success rounded-pill px-3 py-2">
+          Hari ini ada diskon <?= number_to_currency($active_discount, 'IDR') ?> per item
+        </span>
+      </div>
+    <?php endif; ?>
+
+
     <nav class="header-nav ms-auto">
       <ul class="d-flex align-items-center">
 
